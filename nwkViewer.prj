@@ -1,0 +1,70 @@
+<deployment-project plugin="plugin.apptool" plugin-version="1.0">
+  <configuration build-checksum="2549297760" file="/Users/lavanyavaddavalli/Desktop/lppd/code/Viewer/nwkViewer.prj" location="/Users/lavanyavaddavalli/Desktop/lppd/code/Viewer" name="nwkViewer" target="target.mlapps" target-name="Package App">
+    <param.appname>nwkViewer</param.appname>
+    <param.authnamewatermark>Lavanya Vaddavalli</param.authnamewatermark>
+    <param.email />
+    <param.company />
+    <param.icon />
+    <param.icons />
+    <param.summary />
+    <param.description />
+    <param.screenshot />
+    <param.version>1.0</param.version>
+    <param.products.name />
+    <param.products.id />
+    <param.products.version />
+    <param.platforms />
+    <param.output>/Users/lavanyavaddavalli/Desktop/lppd/code</param.output>
+    <param.guid>e2a6e452-2b7c-4970-a395-7b439ccef309</param.guid>
+    <unset>
+      <param.email />
+      <param.company />
+      <param.icon />
+      <param.icons />
+      <param.summary />
+      <param.description />
+      <param.screenshot />
+      <param.version />
+      <param.products.name />
+      <param.products.id />
+      <param.products.version />
+      <param.platforms />
+    </unset>
+    <fileset.main>
+      <file>${PROJECT_ROOT}/nwkViewer.m</file>
+    </fileset.main>
+    <fileset.depfun>
+      <file>${PROJECT_ROOT}/draw_report.txt</file>
+      <file>${PROJECT_ROOT}/nwkConverter.m</file>
+    </fileset.depfun>
+    <fileset.resources>
+      <file>${PROJECT_ROOT}/RenderTubesAsTrianglesTV.m</file>
+      <file>${PROJECT_ROOT}/nwkHelp.m</file>
+      <file>${PROJECT_ROOT}/nwkSim.m</file>
+    </fileset.resources>
+    <fileset.package />
+    <build-deliverables>
+      <file location="/Users/lavanyavaddavalli/Desktop/lppd" name="code" optional="false">/Users/lavanyavaddavalli/Desktop/lppd/code</file>
+    </build-deliverables>
+    <workflow />
+    <matlab>
+      <root>/Applications/MATLAB_R2024a.app</root>
+      <toolboxes />
+    </matlab>
+    <platform>
+      <unix>true</unix>
+      <mac>true</mac>
+      <windows>false</windows>
+      <win2k>false</win2k>
+      <winxp>false</winxp>
+      <vista>false</vista>
+      <linux>false</linux>
+      <solaris>false</solaris>
+      <osver>14.3</osver>
+      <os32>true</os32>
+      <os64>false</os64>
+      <arch>maci64</arch>
+      <matlab>true</matlab>
+    </platform>
+  </configuration>
+</deployment-project>
