@@ -1,5 +1,7 @@
 function [ nodes ] = nwkViewer()
 
+   clear all;
+
    fig = uifigure('Name', 'Properties Window', 'Position', [50 50 350 800]);
 
    axesFig = figure('Name', 'Network Viewer', ...
@@ -17,16 +19,35 @@ function [ nodes ] = nwkViewer()
    global activeG;
    global activeHandle;
    global activeIdx;
+
+   global largeNwk;
+
    global tableGrpBoxes;
+   global applyBtn;
+   global resetBtn;
+   global renameBtn;
+   global grpTitles;
 
-   global sceneRange;
-   global initialLim;
-
+   largeNwk = 1000;
    G = graph([], []);
    faceProp = [];
    global nodeColor;
+   global preColor;
    nodeColor = [0.2 0.2 0.2];
 
+   preColor = [
+    1.0, 0.0, 0.0;  % Red
+    0.0, 0.0, 1.0;  % Blue
+    0.0, 1.0, 0.0;  % Green
+    0.0, 1.0, 1.0;  % Cyan
+    1.0, 0.0, 1.0;  % Magenta
+    0.5, 0.0, 1.0;  % Violet
+    0.3, 0.3, 0.3;  % Dark Grey
+    0.0, 0.5, 0.0;  % Dark Green
+    1.0, 0.5, 0.0;  % Orange
+    0.5, 0.0, 0.0;  % Maroon
+    ];
+    numColors = size(preColor, 1);
 
    % Plot the graph in a uipanel in the same window as the ui buttons
    %uiplot = uipanel(fig, 'Position', [400 120 750 600]);
@@ -46,8 +67,8 @@ function [ nodes ] = nwkViewer()
    ax.YLim = initialYLim;
    ax.ZLim = [-1, 1];
 
-    % Create a uicontrol listbox (dropdown menu)
-    fileDropdown = uicontrol(axesFig, 'Style', 'popupmenu', 'String', ' ', ...
+   % Create a uicontrol listbox (dropdown menu)
+   fileDropdown = uicontrol(axesFig, 'Style', 'popupmenu', 'String', ' ', ...
                          'Position', [0 710 900 40], 'Callback', @changeActiveFile);
 
    %Create tabbed panels (if parent is figure for tabbed group, position should be in percentages)
@@ -83,7 +104,7 @@ function [ nodes ] = nwkViewer()
 
    toggleCylindersView = uicheckbox(viewTab, "Text", "toggleCylindersView",...
        "Position",[140 640 130 22],...
-       "ValueChangedFcn", @togglePlotCb);
+       "ValueChangedFcn", {@togglePlotCb, []});
 
    boundingBoxOn = uicheckbox(viewTab, "Text", "BoundingBoxOn",...
        "Position",[140 620 110 22], ...
@@ -131,7 +152,7 @@ function [ nodes ] = nwkViewer()
        "Position", [20, 250, 260, 170],...
        "BackgroundColor",[0.8 0.8 0.8]);
 
-   selectionGrp = uibuttongroup(viewTab, "Title", "selectionGroup",...
+   selectionGrp = uibuttongroup(viewTab, "Title", "Selection",...
        "TitlePosition","lefttop",...
        "Position", [28, 365, 240, 50],...
        "BackgroundColor",[0.8 0.8 0.8], ...
@@ -152,6 +173,22 @@ function [ nodes ] = nwkViewer()
    faceEditBox = uitextarea(viewTab, "Value", '', ...
        "Position", [80 325 190 35], 'Editable', 'on', ...
        'HorizontalAlignment', 'left', 'WordWrap', 'on');
+    
+    faceEditBox.Tooltip = sprintf(['Allowed formats:\n' ...
+        '- Entries separated by commas.\n' ...
+        '- Entries can be:\n' ...
+        '  1. Single integers (e.g., ''12,23,18'' for face IDs 12, 23, 18).\n' ...
+        '  2. Ranges (e.g., ''18:22'' for face IDs 18, 19, 20, 21, 22).\n' ...
+        '  3. Logical conditions:\n' ...
+        '        - Symbols: d (diameter), l (face length), f (face ID), g (group ID) ' ...
+        '           p1 (inlet point), p2 (outlet point)\n' ...
+        '         - Operators: >, <, =\n' ...
+        '         - Combine conditions with ''&''.\n' ...
+        '         - Example usage: ''d>2&l<10,f>10&f<15,g=13,p1=100''\n' ...
+        '              - ''d>2&l<10'' (Faces with diameter > 2 and face length < 10)\n' ...
+        '              - ''f>10&f<15'' (Faces with face ID equal to 11,12,13,14)\n' ...
+        '              - ''g=13'' (Faces with group ID equal to 13)\n' ...
+        '              - ''p1=100''(Faces that have inlet point as 100)\n']);
 
    %Create point edit label and edit box
    ptEditLabel = uilabel(viewTab, 'Text', 'pointEdit',...
@@ -160,6 +197,23 @@ function [ nodes ] = nwkViewer()
    ptEditBox = uitextarea(viewTab, "Value", '', ...
        "Position", [80 285 190 35], 'Editable', 'on', ...
        'HorizontalAlignment', 'left', 'WordWrap', 'on');
+
+
+    ptEditBox.Tooltip = sprintf(['Allowed formats:\n' ...
+        '- Entries separated by commas.\n' ...
+        '- Entries can be:\n' ...
+        '  1. Single integers (e.g., ''12,23,18'' for point IDs 12, 23, 18)\n' ...
+        '  2. Ranges (e.g., ''18:21'' for point IDs 18, 19, 20, 21)\n' ...
+        '  3. Logical conditions:\n' ...
+        '        - Symbols: DGi (Indegree of a point), DGo (Outdegree of a point), ' ...
+        '           p (point ID), X (X-cordinate of a point) ' ...
+        '           Y (Y-cordinate of a point), Z (Z-cordinate of a point)\n' ...
+        '         - Operators: >, <, =\n' ...
+        '         - Combine conditions with ''&''.\n' ...
+        '         - Example usage: ''X<100&X>20,DGi=1&DGo=2,p>7''\n' ...
+        '              - ''X<100&X>20'' (Points with x coordinate between 20 and 100)\n' ...
+        '              - ''DGi=1&DGo=2'' (Points with 1 indegree and 2 outdegree, bifurcation points)\n' ...
+        '              - ''p>7'' (Points with point IDs from 8 to total number of points(np))\n']);
 
    %Create the Display and Reset button
    displayButton = uibutton(viewTab, 'Text', 'Display',...
@@ -196,29 +250,21 @@ function [ nodes ] = nwkViewer()
    %     'ButtonPushedFcn', @resetButtonCallback);
 
 
-   %Create facegroup
-   faceGrp = uipanel(viewTab, ...
-       "Title", "FaceGroup", ...
-       "Scrollable", "on", ...
-       "TitlePosition","lefttop",...
-       "Position", [20, 10, 260, 235],...
-       "BackgroundColor",[0.8 0.8 0.8]);
-   % 
-   % faceGrpEditBox = uieditfield(faceGrp, "InputType", "text", ...
-   %     "CharacterLimits", [0 Inf], ...
-   %     "Position", [15 10 220 110], ...
-   %     'Editable', 'off', ...
-   %     'ValueChangedFcn', @faceGrpEditCb);
+   %Create a tabbed panel with color selections
+   colorTab = uitabgroup(viewTab, 'Position', [20, 10, 260, 235]);
+   faceGrp = uitab(colorTab, 'Title', 'FaceGroup', 'BackgroundColor', [0.8, 0.8, 0.8], 'Scrollable', 'on');
+   propertiesTab = uitab(colorTab, 'Title', 'Properties', 'BackgroundColor', [0.8, 0.8, 0.8], 'Scrollable', 'on');
 
-
-    % Table to store all the loaded objects
-    rendererTable = table('Size', [0, 7], ...
+   % Table to store all the loaded objects
+   rendererTable = table('Size', [0, 7], ...
                    'VariableTypes', {'string', 'string', 'cell', 'cell', 'cell', 'cell', 'cell'}, ...
                    'VariableNames', {'fileName', 'type', 'nwkObj', 'plotHandle', 'graphObj', 'boxHandle', 'grpColors'});
 
-    % warning('off', 'MATLAB:table:RowsAddedExistingVars');
-    % warning('off', 'MATLAB:saveas:UIComponentWillBeExcluded');
-    warning('off', 'all');
+   viewTable = table('Size', [0, 4], ...
+                    'VariableTypes', {'string', 'string', 'cell', 'cell'}, ...
+                    'VariableNames', {'fileName', 'type', 'nwkObj', 'patchObj'});
+
+   warning('off', 'all');
 
    %Initialise the starting Limits for X, Y, Z axes
    global initialXLimits;
@@ -301,36 +347,53 @@ function [ nodes ] = nwkViewer()
     
     end
     
-    function togglePlotCb(~, ~)
+    function togglePlotCb(~, ~, facesList, collColor)
 
-        if contains(activeHandle.UserData(1).type, 'graph') && toggleCylindersView.Value
-            
-            delete(rendererTable.plotHandle{activeIdx});
+        fig.Pointer = 'watch'; axesFig.Pointer = 'watch';
 
-            G = graph(activeNwk.faceMx(:, 2), activeNwk.faceMx(:, 3));  
+        if toggleCylindersView.Value            
+            if isempty(facesList)
+                if ~isempty(activeHandle.UserData(1).groups)
+                    groupIds = activeHandle.UserData(1).groups;
+                    facesList = find(ismember(activeNwk.faceMx(:, 1), groupIds));
+                
+                    %elseif ~isempty(activeHandle.UserData(1).selections) 
+                    %selections will have hanging points too, then?
+                else
+                    facesList = (1:activeNwk.nf)';
+                end
+            end
 
-            faceMxTemp = activeNwk.faceMx( :, 2 : 3 );
-            [ faceMxTemp, ~ ] = sort( faceMxTemp,  2 );
-            [     ~     , sortColumn   ] = sort( faceMxTemp(:, 2));
-            faceMxTemp = faceMxTemp( sortColumn, : );
-            [     ~     , sortRow      ] = sort( faceMxTemp(:,1));
+            if ~isempty(rendererTable.plotHandle{activeIdx})
+                delete(rendererTable.plotHandle{activeIdx});
+            end
 
-            G.Edges.dia       =     activeNwk.dia( sortColumn( sortRow ));
-            faceProp = activeNwk.dia;
-            G.Edges.EdgeCData =     faceProp( sortColumn( sortRow ));
-
-            edgesMx = table2array(G.Edges);
-            colorSub = edgesMx( :, 4 );
+            color = [];
+            if nargin > 3 && ~isempty(collColor)
+                color = collColor;
+            elseif ~isempty(rendererTable.grpColors{activeIdx})
+                firstColor = rendererTable.grpColors{activeIdx}.values{1};
+                for i = 2:length(rendererTable.grpColors{activeIdx}.keys)
+                    if ~isequal(rendererTable.grpColors{activeIdx}.values{i}, firstColor)
+                        color = jet(256);
+                        break;
+                    end
+                end
+                if isempty(color)
+                    color = firstColor;
+                end
+            else
+                color = jet(256);
+            end
 
             hold(ax, 'on');
-            [~, ~, activeHandle, ~, ~, ~] = RenderTubesAsTrianglesTV(activeNwk.ptCoordMx, activeNwk.faceMx, activeNwk.dia,...
-                colorSub, [], [], 'arc faceMx', jet(256));
+            [~, activeHandle] = RenderNwkTV(activeNwk, facesList, activeNwk.dia, [], [], [], color);
             colorbar;
             hold(ax, 'off');
 
             rendererTable.plotHandle{activeIdx} = activeHandle;
 
-            activeHandle.UserData(1).type = 'tubes';
+            activeHandle.UserData(1).type = 'cylinders';
 
             labelsOn.Value = false;
             directionsOn.Value = false;
@@ -344,16 +407,16 @@ function [ nodes ] = nwkViewer()
                 faceSelectCb();
             end
 
-        elseif strcmp(activeHandle.UserData(1).type, 'tubes') && ~toggleCylindersView.Value
+        elseif strcmp(activeHandle.UserData(1).type, 'cylinders') && ~toggleCylindersView.Value
 
-            if  ~isempty(ptEditBox.Value) || ~isempty(faceEditBox.Value)
+            if  ~isempty(ptEditBox.Value{1}) || ~isempty(faceEditBox.Value{1})
                    updateSelections();
             else
                    faceGrpEditCb();
             end
             colorbar('off');
         end
-
+        fig.Pointer = 'arrow'; axesFig.Pointer = 'arrow';
 
     end
 
@@ -402,38 +465,61 @@ function [ nodes ] = nwkViewer()
 
     function loadButtonCb(~, ~)
 
-         [file, path] = uigetfile('*.fMx;*.coll', 'Select a file to load');
+         [file, path] = uigetfile('*.fMx;*.coll;*.stl', 'Select a file to load');
          if isequal(file, 0) || isequal(path, 0)
               disp('File selection canceled');
               return
          end
          [~, ~, ext] = fileparts(fullfile(path, file));
 
+         fig.Pointer = 'watch'; axesFig.Pointer = 'watch';
          tic;
         
          if strcmp(ext, '.coll')
             fid = fopen(fullfile(path, file), 'r');
             if fid == -1
-                error('Unable to open the collection file.');
+                disp('Unable to open the collection file.');
+                return
             end
 
-            collPaths = textscan(fid, '%s', 'Delimiter', '\n');
-            collPaths = collPaths{1};
+            validViews = {'cylinders', 'graph'};
+            collData = {};
+    
+             while ~feof(fid)
+                line = fgetl(fid);
+                
+                paths = regexp(line, 'path=([^, ]+)', 'tokens');
+                colors = regexp(line, 'color=([^, ]+)', 'tokens');
+                views = regexp(line, 'view=([^, ]+)', 'tokens');
+                
+                if isempty(paths)
+                    disp('Invalid collection file. Format should be path=<absolute-path>\n,color=<color-name>,view=<cylinders/graph>');
+                    return
+                else
+                    if isempty(views) || ~ismember(views{1}{1}, validViews)
+                       views{1}{1} = 'graph';
+                    end
+                    if isempty(colors)
+                        colors{1}{1} = 'black';
+                    end
+                    collData(end+1, :) = {paths{1}{1}, colors{1}{1}, views{1}{1}};
+                end
+            end
+
             fclose(fid);
             
-            for i = 1:numel(collPaths)
-                collFilePath = collPaths{i};
-                loadScene(collFilePath);
+            for i = 1:size(collData, 1)
+                collFilePath = collData{i, 1};
+                loadScene(collFilePath, collData{i, 3}, collData{i, 2});
+                fprintf("Loaded nwk : %s\n", collFilePath);
+
             end
 
          else
             
-             loadScene(fullfile(path, file));
-
-         end
-
-         if ~strcmp(rendererTable{activeIdx, 2}, '.stl')
+             loadScene(fullfile(path, file), 'graph');
              initGroupBox();
+
          end
 
          % Reset point and face highlights' UI options
@@ -449,10 +535,11 @@ function [ nodes ] = nwkViewer()
 
          loadTime = toc;
          fprintf("Load time for nwk : %.2f seconds\n", loadTime);
+         fig.Pointer = 'arrow';  axesFig.Pointer = 'arrow';
        
     end
 
-    function loadScene(filePath)
+    function loadScene(filePath, view, collColor)
         [path, name, ext] = fileparts(filePath);
 
          if strcmp(ext, '.fMx')
@@ -460,33 +547,46 @@ function [ nodes ] = nwkViewer()
              activeIdx = size(rendererTable, 1) + 1;
              rendererTable(activeIdx, 1:3) = {filePath, ext, {activeNwk}};
             
-             plotGraph();
+             if activeNwk.nf > largeNwk || activeNwk.np > largeNwk
+                  grpIds = selectLoadGrps();
+                  facesList = find(ismember(activeNwk.faceMx(:, 1), grpIds));
+
+                  if strcmp(view, 'graph')
+                      plotSubsetFacesPts(facesList, []);
+                  else
+                      toggleCylindersView.Value = true;
+                      togglePlotCb([], [], facesList, collColor);
+                  end
+                  activeHandle.UserData(1).groups = grpIds;
+             else
+                 if strcmp(view, 'graph')
+                     plotGraph();
+                 else
+                     toggleCylindersView.Value = true;
+                     togglePlotCb([], [], (1:activeNwk.nf)', collColor);
+                 end
+             end
+
+             expandAxesLimits(ax, activeNwk);
+             createPngForIco(filePath);
+             initGroupBox(collColor);
 
          elseif strcmp(ext, '.stl')
 
-           %  activeNwk = nwkConverter.stl2nwk(filePath);
-
-             activeIdx = size(rendererTable, 1) + 1;
-             rendererTable(activeIdx, 1:3) = {filePath, ext, {activeNwk}};
-
-             plotStl();
-
-             delGrpCheckboxes();
+             stlNwk = nwkConverter.stl2nwk(filePath);
+             idx = size(viewTable, 1) + 1;
+             viewTable(idx, 1:3) = {filePath, ext, {stlNwk}};
+             plotStl(stlNwk);
+             expandAxesLimits(ax, stlNwk);
 
          elseif strcmp(ext, '.msh')
 
-             %activeNwk = nwkConverter.mesh2nwk(filePath);
-
-             activeIdx = size(rendererTable, 1) + 1;
-             rendererTable(activeIdx, 1:3) = {filePath, ext, {activeNwk}};
-
+             meshNwk = nwkConverter.mesh2nwk(filePath);
+             idx = size(viewTable, 1) + 1;
+             viewTable(idx, 1:3) = {filePath, ext, {meshNwk}};
              plotMesh();
-            
+             expandAxesLimits(ax, meshNwk);
          end
-
-         expandAxesLimits(ax, activeNwk);
-
-         createPngForIco(filePath);
 
     end
 
@@ -510,7 +610,7 @@ function [ nodes ] = nwkViewer()
     end    
 
 
-    function initGroupBox()
+    function initGroupBox(collColor)
 
         delGrpCheckboxes();
 
@@ -520,9 +620,12 @@ function [ nodes ] = nwkViewer()
 
         uniqueGroupIDs = unique(activeNwk.faceMx(:, 1));
         numGrpIds = numel(uniqueGroupIDs);
-        tableGrpBoxes = table('Size', [numGrpIds, 2], ...
-                   'VariableTypes', {'cell', 'cell'}, ...
-                   'VariableNames', {'grpBoxHandles', 'colorPickers'});
+        tableGrpBoxes = table('Size', [numGrpIds, 3], ...
+                   'VariableTypes', {'cell', 'cell', 'cell'}, ...
+                   'VariableNames', {'grpBoxHandles', 'colorPickers', 'numFaces'});
+        grpTitles = table('Size', [numGrpIds, 1], ...
+                   'VariableTypes', {'cell'}, ...
+                   'VariableNames', {'title'});
         
         len = 20 * numGrpIds + 5;
         if len < 230
@@ -532,10 +635,14 @@ function [ nodes ] = nwkViewer()
         scroll(faceGrp, 'top');
 
         colorsExist = false;
-        if isempty(rendererTable.grpColors{activeIdx})
-            grpColor = configureDictionary("double", "cell");
+        if nargin > 0 && ~isempty(collColor)
+             collColor = validateColor(collColor);
+             grpColor = configureDictionary("double", "cell");
+        elseif isempty(rendererTable.grpColors{activeIdx})
+             grpColor = configureDictionary("double", "cell");
+             collColor = '';
         else
-            colorsExist = true;
+             colorsExist = true;
         end
 
         if isfield(activeHandle.UserData, 'groups') && ~isempty(activeHandle.UserData(1).groups)
@@ -544,26 +651,58 @@ function [ nodes ] = nwkViewer()
             groupIds = uniqueGroupIDs;
         end
 
+        % Titles
+        grpTitles.title{1} = uilabel(faceGrp, 'Text', 'Group ID', 'FontWeight', 'bold', 'FontSize', 10, ...
+            'HorizontalAlignment', 'left', 'Position', [20, len + 15, 60, 15]);
+        grpTitles.title{2} = uilabel(faceGrp, 'Text', 'Color', 'FontWeight', 'bold', 'FontSize', 10, ...
+            'HorizontalAlignment', 'left', 'Position', [90, len + 15, 30, 15]);
+        grpTitles.title{3} = uilabel(faceGrp, 'Text', 'Faces', 'FontWeight', 'bold', 'FontSize', 10, ...
+            'HorizontalAlignment', 'left', 'Position', [130, len + 15, 60, 15]);
+
         for i = 1:numGrpIds
             isChecked = ismember(uniqueGroupIDs(i), groupIds);
 
             grpChkBox = uicheckbox(faceGrp, 'Text', num2str(uniqueGroupIDs(i)), ...
-               'Value', isChecked, 'Position', [20,  len - i * 20, 60, 20], 'ValueChangedFcn', @faceGrpEditCb);
+               'Value', isChecked, 'Position', [20,  len - i * 20, 60, 20]);
 
             if colorsExist 
-                color = rendererTable.grpColors{activeIdx}{uniqueGroupIDs(i)};
+                if isKey(rendererTable.grpColors{activeIdx}, uniqueGroupIDs(i))
+                    color = rendererTable.grpColors{activeIdx}{uniqueGroupIDs(i)};
+                else  % When network's group ids are edited, useful when new grpid is added
+                    colorIdx = mod(i-1, numColors) + 1;
+                    rendererTable.grpColors{activeIdx}{uniqueGroupIDs(i)} = preColor(colorIdx, :);
+                    color = rendererTable.grpColors{activeIdx}{uniqueGroupIDs(i)};
+                end    
             else
-                color = rand(1, 3);
+                if isempty(collColor)
+                    colorIdx = mod(i-1, numColors) + 1;
+                    color = preColor(colorIdx, :);
+                else
+                    color = collColor;
+                end
                 grpColor(uniqueGroupIDs(i)) = {color};
             end
             
             colorBox = uicolorpicker(faceGrp, 'Value', color, ...
-                'Position', [90,  len - i * 20, 30, 20], 'ValueChangedFcn', @colorGrpEditCb);
+                'Position', [90,  len - i * 20, 30, 20]);
+
+            numFaces = sum(ismember(activeNwk.faceMx(:, 1), uniqueGroupIDs(i)));        
+            nfLabel = uilabel(faceGrp, 'Text', sprintf('(%d)', numFaces), 'FontSize', 8, ...
+                'Position', [130, len - i * 20, 60, 20]);
 
             grpChkBox.UserData = i; % table index
             colorBox.UserData = uniqueGroupIDs(i); % group index            
-            tableGrpBoxes{i, :} =  {grpChkBox, colorBox};
+            tableGrpBoxes{i, :} =  {grpChkBox, colorBox, nfLabel};
         end
+
+        applyBtn = uibutton(faceGrp, 'Text', 'Apply', 'FontSize', 10, ...
+            'Position', [200, 180, 50, 30], 'ButtonPushedFcn', @faceGrpEditCb);
+
+        resetBtn = uibutton(faceGrp, 'Text', 'Reset', 'FontSize', 10, ...
+            'Position', [200, 140, 50, 30], 'ButtonPushedFcn', @resetColors);
+
+        renameBtn = uibutton(faceGrp, 'Text', 'Rename', 'FontSize', 10, ...
+            'Position', [200, 100, 50, 30], 'ButtonPushedFcn', @renameGrps);
 
         if ~colorsExist
             rendererTable.grpColors{activeIdx} = grpColor;
@@ -575,10 +714,21 @@ function [ nodes ] = nwkViewer()
 
     function clearPlotCb(~, ~)
         objNames = rendererTable.fileName;
+        if ~isempty(viewTable)
+            viewNames = viewTable.fileName;
+            objNames = [objNames , viewNames];
+        end
         [selectedIdx, ok] = listdlg('ListString', objNames, 'SelectionMode', 'single',...
             'PromptString', 'Select an object to clear:', 'Name', 'Select Object', 'ListSize', [300, 100]);        
     
-        if ok    
+        if ok
+            if selectedIdx > size(rendererTable, 1)
+                idx = selectedIdx - size(rendererTable, 1);
+                delete(viewTable.patchObj{idx});
+                viewTable(idx, :) = [];
+                return;
+            end
+
             delete(rendererTable.plotHandle{selectedIdx});
             rendererTable(selectedIdx, :) = [];
 
@@ -605,6 +755,8 @@ function [ nodes ] = nwkViewer()
 
 
     function plotGraph(~, ~)
+
+        fig.Pointer = 'watch'; axesFig.Pointer = 'watch';
 
         if directionsOn.Value && activeNwk.nf
             G = digraph(activeNwk.faceMx(:, 2), activeNwk.faceMx(:, 3), 1:activeNwk.nf);
@@ -641,16 +793,29 @@ function [ nodes ] = nwkViewer()
             labelsOnCb();
         end
 
+         % Disable datacursor mode if it is set
+        if ptSelect.Value
+            ptSelect.Value = false;
+            ptSelectCb();
+        elseif faceSelect.Value
+            faceSelect.Value = false;
+            faceSelectCb();
+        end
+
+        drawnow;
+
+        fig.Pointer = 'arrow'; axesFig.Pointer = 'arrow';
     end
 
-    function plotStl()
+    function plotStl(stlNwk)
         
         hold(ax, "on");
-        activeHandle = patch(ax, 'Faces', activeNwk.faceMx3, 'Vertices', activeNwk.ptCoordMx, ...
+        stlHandle = patch(ax, 'Faces', stlNwk.faceMx3, 'Vertices', stlNwk.ptCoordMx, ...
             'FaceColor', [0.8 0.8 0.8], 'EdgeColor', [0.75 0.75 0.75]);
         hold(ax, "off");
 
-        rendererTable(activeIdx, 4) = {{activeHandle}};
+        idx = size(viewTable, 1);
+        viewTable(idx, 4) = {{stlHandle}};
 
     end    
 
@@ -678,9 +843,6 @@ function [ nodes ] = nwkViewer()
         ax.XLim = xlDefault;
         ax.YLim = ylDefault;
         ax.ZLim = zlDefault;
-
-        initialLim = [xlDefault ; ylDefault ; zlDefault];
-        sceneRange = [diff(xlDefault) diff(ylDefault) diff(zlDefault)];
     end
     
     function snapshotCb(~, ~)
@@ -778,6 +940,7 @@ function [ nodes ] = nwkViewer()
 
     function labelsOnCb(~, ~)
 
+        % Always shows only 100 labels
         tic;
         ptThreshold = 100;
         faceThreshold = 100;
@@ -804,7 +967,7 @@ function [ nodes ] = nwkViewer()
             set(activeHandle, 'NodeLabel', '', 'EdgeLabel', '');
         end
         elapsedTime = toc;
-        fprintf('Time taken: %.2f seconds\n', elapsedTime);
+        fprintf('Time taken for labelling: %.2f seconds\n', elapsedTime);
 
     end
 
@@ -927,11 +1090,14 @@ function [ nodes ] = nwkViewer()
     
     % Move camera horizantally and vertically
     function moveHorizVertCb(src, ~)
+        
         if isempty(initialMousePos)
             initialMousePos = get(src, 'CurrentPoint');
             return;
         end
-            
+        
+        fig.Pointer = 'watch'; axesFig.Pointer = 'watch';
+
         currentMousePos = get(src, 'CurrentPoint');
         dx = currentMousePos(1) - initialMousePos(1);
         dy = currentMousePos(2) - initialMousePos(2);
@@ -939,11 +1105,17 @@ function [ nodes ] = nwkViewer()
             
          % Update initial mouse position for next callback
         initialMousePos = currentMousePos;
+
+
+        fig.Pointer = 'arrow'; axesFig.Pointer = 'arrow';
     end
     
     
     % Rotate the camera
     function rotateCb(src, ~)
+
+       fig.Pointer = 'watch'; axesFig.Pointer = 'watch';
+       
        if isempty(initialMousePos)
            initialMousePos = get(src, 'CurrentPoint');
            return;
@@ -956,6 +1128,9 @@ function [ nodes ] = nwkViewer()
         
        % Update initial mouse position for next callback
        initialMousePos = currentMousePos;
+
+
+       fig.Pointer = 'arrow'; axesFig.Pointer = 'arrow';
     end
     
     minZoomDist = 1;
@@ -965,6 +1140,8 @@ function [ nodes ] = nwkViewer()
     function camZoomCb(~, event)
         % Scroll distance is +ve for scrolling up, -ve for scrolling down
         scrollDist = event.VerticalScrollCount;
+
+        fig.Pointer = 'watch'; axesFig.Pointer = 'watch';
     
         % Fraction of total distance to move the camera
         fraction = 0.1;
@@ -978,6 +1155,9 @@ function [ nodes ] = nwkViewer()
         if newZoomDist >= minZoomDist && newZoomDist <= maxZoomDist
             set(ax, 'CameraViewAngleMode', 'manual', 'CameraPosition', newCamPos);
         end
+       
+        fig.Pointer = 'arrow'; axesFig.Pointer = 'arrow';
+
     end
 
     % Callback function for the checkbox
@@ -1095,12 +1275,16 @@ function [ nodes ] = nwkViewer()
 
     function updateSelections(~, ~)
 
+
+        fig.Pointer = 'watch'; axesFig.Pointer = 'watch';
+
         ptSelections = ptEditCb();
         faceSelections = faceEditCb();
         
         if selectionRb2.Value
             
             plotSubsetFacesPts(faceSelections, ptSelections);
+            reColorGrps();
 
             try
                 activeHandle.UserData(1).selections = {strjoin(ptEditBox.Value, ''), strjoin(faceEditBox.Value, ''), 2};
@@ -1114,6 +1298,7 @@ function [ nodes ] = nwkViewer()
             faceSelections = setdiff(1:activeNwk.nf, faceSelections)';
 
             plotSubsetFacesPts(faceSelections, ptSelections);
+            reColorGrps();
 
             try
                 activeHandle.UserData(1).selections = {strjoin(ptEditBox.Value, ''), strjoin(faceEditBox.Value, ''), 3};
@@ -1127,9 +1312,9 @@ function [ nodes ] = nwkViewer()
 
             plotGraph();
 
+            % Color everything black, except the green highlights
             set(activeHandle, 'NodeColor', nodeColor, 'MarkerSize', 2);
-            set(activeHandle, 'LineWidth', 2);
-            reColorGrps();
+            set(activeHandle, 'EdgeColor', 'black', 'LineWidth', 2);
 
             highlight(activeHandle, ptSelections, 'NodeColor', 'green', 'MarkerSize', 8);
             faceRows = find(ismember(activeG.Edges.Weight(:), faceSelections));
@@ -1144,6 +1329,9 @@ function [ nodes ] = nwkViewer()
         if ~isempty(ptSelections) || ~isempty(faceSelections)
             writeToReport('Selected points and faces: ', ptSelections, faceSelections);
         end
+
+        fig.Pointer = 'arrow'; axesFig.Pointer = 'arrow';
+
     end
 
     function resetSelections(~, ~)
@@ -1176,8 +1364,11 @@ function [ nodes ] = nwkViewer()
             'Position', [500, 300, 500, 800], 'Scrollable', 'on');
 
         % Display the matrix
-        faceTmp = [activeNwk.faceMx(faceSelections, 1), activeNwk.faceMx(faceSelections, 2),...
-            activeNwk.faceMx(faceSelections, 3), activeNwk.dia(faceSelections)];
+        faceTmp = [num2cell(int32(activeNwk.faceMx(faceSelections, 1))), ...
+            num2cell(int32(activeNwk.faceMx(faceSelections, 2))), ...
+            num2cell(int32(activeNwk.faceMx(faceSelections, 3))), ...
+            num2cell(double(activeNwk.dia(faceSelections)))];
+
         ptTmp = activeNwk.ptCoordMx(ptSelections, 1:3);
 
         uilabel(editFig, 'Text', 'Face Selection Matrix: ', 'Position', [20, 760, 460, 20]);
@@ -1203,21 +1394,21 @@ function [ nodes ] = nwkViewer()
         'Position', [20, 80, 460, 120], 'Editable', 'on', 'HorizontalAlignment', 'left', 'WordWrap', 'on');
 
         % Create Save button
-        saveBtn = uibutton(editFig, 'Text', 'Save', 'Position', [50, 30, 80, 30], ...
-            'ButtonPushedFcn', @(~, ~) saveChanges());
+        applyEditsBtn = uibutton(editFig, 'Text', 'Apply', 'Position', [50, 30, 80, 30], ...
+            'ButtonPushedFcn', @(~, ~) applyEditCb());
 
         % Create Cancel button
         cancelBtn = uibutton(editFig, 'Text', 'Cancel', 'Position', [150, 30, 80, 30], ...
             'ButtonPushedFcn', @(~, ~) close(editFig));
 
         % Nested function to save changes
-        function saveChanges()
+        function applyEditCb()
             faceEditedData = faceTable.Data;
 
-            activeNwk.faceMx(faceSelections, 1) = faceEditedData(:, 1);
-            activeNwk.faceMx(faceSelections, 2) = faceEditedData(:, 2);
-            activeNwk.faceMx(faceSelections, 3) = faceEditedData(:, 3);
-            activeNwk.dia(faceSelections) = faceEditedData(:, 4);
+            activeNwk.faceMx(faceSelections, 1) = cell2mat(faceEditedData(:, 1));
+            activeNwk.faceMx(faceSelections, 2) = cell2mat(faceEditedData(:, 2));
+            activeNwk.faceMx(faceSelections, 3) = cell2mat(faceEditedData(:, 3));
+            activeNwk.dia(faceSelections) = cell2mat(faceEditedData(:, 4));
 
             ptEditedData = ptTable.Data;
             activeNwk.ptCoordMx(ptSelections, 1:3) = ptEditedData(:, 1:3);
@@ -1308,7 +1499,6 @@ function [ nodes ] = nwkViewer()
         %         activeNwk.faceMx(facesList, 3), 'EdgeColor', 'white');
         %     set(tableGrpBoxes.colorPickers{tableIdx}, 'Value', 'white');
         % end
-
  
         checkedGroupIDs = [];
         for i = 1:size(tableGrpBoxes, 1)
@@ -1321,12 +1511,22 @@ function [ nodes ] = nwkViewer()
         facesList = find(ismember(activeNwk.faceMx(:, 1), checkedGroupIDs));
 
         if size(facesList, 1) == activeNwk.nf
-             plotGraph();
-             reColorGrps();
-             updateEndPoints();
-             updateEndFaces();
+
+             if toggleCylindersView.Value
+                 togglePlotCb([], [], (1:activeNwk.nf)');
+             else
+                plotGraph();
+                reColorGrps();
+                updateEndPoints();
+                updateEndFaces();
+             end
         else
-            plotSubsetFacesPts(facesList, []);
+             if toggleCylindersView.Value
+                 togglePlotCb([], [], facesList);
+             else
+                plotSubsetFacesPts(facesList, []);
+                reColorGrps();
+             end
 
             if selectionRb1.Value
                 val = 1;
@@ -1342,6 +1542,9 @@ function [ nodes ] = nwkViewer()
             end
  
         end
+
+        resetOnRedraw();
+        
     end
 
     function colorGrpEditCb(src, ~)
@@ -1371,6 +1574,8 @@ function [ nodes ] = nwkViewer()
     function plotSubsetFacesPts(facesList, ptsList)
 
             uniquePts = [];
+
+            fig.Pointer = 'watch'; axesFig.Pointer = 'watch';
 
             if directionsOn.Value
                 subG = digraph([], []);
@@ -1445,7 +1650,19 @@ function [ nodes ] = nwkViewer()
             activeG = subG;
             rendererTable{activeIdx, 4} = {activeHandle};
             rendererTable{activeIdx, 5} = {activeG};
-            reApplyHighlights();
+
+            % Disable datacursor mode if it is set
+            if ptSelect.Value
+                ptSelect.Value = false;
+                ptSelectCb();
+            elseif faceSelect.Value
+                faceSelect.Value = false;
+                faceSelectCb();
+            end
+
+            drawnow;
+            fig.Pointer = 'arrow'; axesFig.Pointer = 'arrow';
+
     end
 
    function delGrpCheckboxes()
@@ -1455,7 +1672,12 @@ function [ nodes ] = nwkViewer()
             for i = 1:height(tableGrpBoxes)
                 delete(tableGrpBoxes.grpBoxHandles{i});
                 delete(tableGrpBoxes.colorPickers{i});
+                delete(tableGrpBoxes.numFaces{i});
             end
+        end
+        delete(applyBtn); delete(resetBtn); delete(renameBtn);
+        if exist('grpTitles', 'var') && ~isempty(grpTitles)
+            delete(grpTitles.title{1}); delete(grpTitles.title{2}); delete(grpTitles.title{3});
         end
    end
 
@@ -1487,6 +1709,10 @@ function [ nodes ] = nwkViewer()
     end
         
     function reColorGrps()
+
+       if strcmp(activeHandle.UserData(1).type, 'cylinders')
+           return
+       end
 
        for i = 1:size(tableGrpBoxes, 1)
              if tableGrpBoxes.grpBoxHandles{i}.Value 
@@ -1596,13 +1822,13 @@ function [ nodes ] = nwkViewer()
                     indices = value:value:activeNwk.np;
                 end
 
-            elseif any(startsWith(condition, {'Px', 'Py', 'Pz', 'DGi', 'DGo'}))
+            elseif any(startsWith(condition, {'X', 'Y', 'Z', 'DGi', 'DGo'}))
 
-                if strcmp(condition(1:2), 'Px')              
+                if strcmp(condition(1), 'X')              
                     searchCol = activeNwk.ptCoordMx(:, 1);                
-                elseif strcmp(condition(1:2), 'Py')                    
+                elseif strcmp(condition(1), 'Y')                    
                     searchCol = activeNwk.ptCoordMx(:, 2);
-                elseif strcmp(condition(1:2), 'Pz')
+                elseif strcmp(condition(1), 'Z')
                     searchCol = activeNwk.ptCoordMx(:, 3);
                 elseif strcmp(condition(1:3), 'DGi')
                     if ~isfield(activeNwk, 'inDeg')
@@ -1654,8 +1880,8 @@ function [ nodes ] = nwkViewer()
             boundingBoxCb();
         end
 
-        if toggleCylindersView.Value && contains(activeHandle.UserData(1).type, 'graph') || ~toggleCylindersView.Value && strcmp(activeHandle.UserData(1).type, 'tubes')
-            togglePlotCb();
+        if toggleCylindersView.Value && contains(activeHandle.UserData(1).type, 'graph') || ~toggleCylindersView.Value && strcmp(activeHandle.UserData(1).type, 'cylinders')
+            togglePlotCb([], [], []);
         end
 
         directionsOnCb();
@@ -1663,6 +1889,25 @@ function [ nodes ] = nwkViewer()
         labelsOnCb();
 
     end
+
+    function resetOnRedraw()
+    
+        % Disable face or pt selection modes if it is set
+        if ptSelect.Value
+            ptSelect.Value = false;
+            ptSelectCb();
+        elseif faceSelect.Value
+            faceSelect.Value = false;
+            faceSelectCb();
+        end
+
+        % if toggleCylindersView.Value
+        %     toggleCylindersView.Value = false;
+        %     colorbar('off');
+        % end
+
+
+    end    
 
 
     function reApplyHighlights()
@@ -1692,4 +1937,54 @@ function [ nodes ] = nwkViewer()
             end
         end
     end
+
+    function color = validateColor(colorName)
+        colorName = lower(colorName);
+        validColors = {'red', 'blue', 'green', 'cyan', 'magenta', 'yellow', 'black', 'white'};
+        if ismember(colorName, validColors)
+            color = colorName;
+        else
+            color = 'black';
+        end
+    end
+
+    function [grpIds] = selectLoadGrps()
+
+        groupIDs = activeNwk.faceMx(:, 1);
+        dia = activeNwk.dia;
+
+        % Choose two groups with largest diameters
+        % Compares 25th percentile of each group
+        uniqueGroupIDs = unique(groupIDs);
+        groupPercentiles = zeros(length(uniqueGroupIDs), 1);
+        for i = 1:length(uniqueGroupIDs)
+            groupIdx = groupIDs == uniqueGroupIDs(i);
+            groupPercentiles(i) = prctile(dia(groupIdx), 50);
+        end
+        [~, sortedIdx] = sort(groupPercentiles);
+        sortedGroupIds = uniqueGroupIDs(sortedIdx);
+        grpIds = sortedGroupIds(end:-1:end-1)';
+
+        if size(uniqueGroupIDs, 1) == 2
+            grpIds = sortedGroupIds(end)';
+        end
+
+        % % Choose two groups with least number of faces
+        % uniqueGroupIDs = unique(groupIDs);
+        % groupCounts = arrayfun(@(x) sum(groupIDs == x), uniqueGroupIDs);
+        % [~, sortedIdx] = sort(groupCounts);
+        % smallestGroups = uniqueGroupIDs(sortedIdx(1:2));
+        % grpIds = smallestGroups;
+    end
+
+    function resetColors(~, ~)
+
+        % Delete existing colors, so new group area is created with predefined colors
+        rendererTable.grpColors{activeIdx}([unique(activeNwk.faceMx(:,1))]) = [];
+        initGroupBox();
+        
+        % Apply the new color changes to graph
+        faceGrpEditCb();
+    end    
+ 
 end
